@@ -1,0 +1,57 @@
+Challenge 0:
+We create the .hello_there file
+
+Challenge 1:
+We remove write permisions from the file
+
+Challenge 2:
+Find the procces id using pidof and send it the SIGCONT signal using kill -SIGCONT <pid>
+
+Challenge 3:
+Run riddle with ANSWER=42
+
+Challenge 4:
+mkfifo magic_mirror
+
+Challenge 5:
+We make a script that opens the .hello_there file changes the fd to be 99 and execve the riddle
+
+Challenge 6:
+We make a script that opens the fifo file magic_mirror and uses dup2 to assign the fds 33 34 53 54 to it
+
+Challenge 7:
+ln .hello_there .hey_there
+
+Challenge 8:
+We make a script that crates 10 files named bf00-bf09 and fills them with 1073741824 bytes
+
+Challenge 9:
+We make a script that opens a socket to liste n to the ip that riddle is broadcasting to
+
+Challenge 10:
+We create a script that creates the file secret number then creates a child that does 
+execve riddle then the parentwaits a bit for riddle to write the number in the file, 
+reads it and writes it into a defferent file for us to read
+
+Challenge 11:
+The same as challenge 10
+
+Challenge 12:
+We run riddle with strace to see what is the name of the file it created and
+what character wants to find and we run a script we made that takes as arguments
+the file name and the character, opens the file, lseek the correct position and writes the character
+
+Chalenge 13:
+We create a script that opens the .hello_there file, makes a child that runs riddle, waits a bit for 
+riddle to truncate the file and then it truncates it back to full size
+
+Chalenge 14:
+We create a script that calls fork until the pid is 32767. Before that we change the file that keeps the
+current pid to be close to that so that we dont have to wait a lot
+
+Challenge 15:
+We create a file that contains a function called setup_tier2 and compile it to an so using
+gcc -shared -o tier2.so -fPIC script15.c
+
+Challenge 16:
+In the setup_tier2 function we mmap a pointer to the address riddle specifies and asign it the value of its pid
