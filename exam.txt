@@ -26,7 +26,7 @@ Challenge 8:
 We make a script that crates 10 files named bf00-bf09 and fills them with 1073741824 bytes
 
 Challenge 9:
-We make a script that opens a socket to liste n to the ip that riddle is broadcasting to
+nc -l 49842 in another terminal before running riddle
 
 Challenge 10:
 We create a script that creates the file secret number then creates a child that does 
@@ -55,3 +55,23 @@ gcc -shared -o tier2.so -fPIC script15.c
 
 Challenge 16:
 In the setup_tier2 function we mmap a pointer to the address riddle specifies and asign it the value of its pid
+
+Challenge  18: 'Tier3'
+Hint:          'How did you get so far?'.
+What's the password?
+Eh.. wh.. what?
+Who's there?
+Leave me alone, I'm just a lowly imp.
+STOP POKING ME!
+I always wanted to be a dragon slayer...
+but for now I'm just trapped in an easter egg :-(
+You know, this riddle is IMPossible!
+Haha I made a joke!
+If I tell you the password will you help me escape?
+If you don't know what password, come back when you're a hero
+Still here?
+OK, the password is 'deep padufly blue'. Please don't go, set me free...
+I gave you the password, will you set me free?
+I'll tell you my secret...
+I'm not really an IMP, I was an ELF once
+but I... annoyed the wrong kind of Wizard :-(
