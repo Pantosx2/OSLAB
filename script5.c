@@ -8,7 +8,7 @@
 int main(int argc, char **argv)
 {
     int fd;
-    fd = open(".hello_there", O_RDWR);
+    fd = open(".hello_there", O_RDONLY);
     dup2(fd, 99);
     char *const *A[1];
     const char *a = "./riddle";

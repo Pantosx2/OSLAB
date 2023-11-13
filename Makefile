@@ -1,6 +1,6 @@
 .PHONY: all clean cleanbf
 
-all: script2 script5 script6 script8 script9 script10 script12 script13 script14 script15
+all: script2 script5 script6 script8 script9 script10 script12 script13 script14 script15 script17
 
 CC = gcc
 CFLAGS = -g -O2
@@ -35,6 +35,9 @@ script14: script14.c
 
 script15: script15.c
 	$(CC) -shared -o tier2.so -fPIC $^
+
+script17: script17.c
+	$(CC) -shared -o tier3.so -fPIC $^
 
 clean: 
 	rm -f script2 script5 script8 script10
