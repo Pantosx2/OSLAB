@@ -1,0 +1,20 @@
+#challenge 5
+./riddle 99>&1
+
+#challenge 8
+truncate -s 1073741824 bf00
+echo A >> bf00
+for i in {1..10} ; do ln bf00 bf$(printf "%.2d" $i) ; done
+
+#challenge 9
+#Εδώ άνοιξα σε άλλο cli το socket, χωρίς κάποιο script, πήρα εκεί την 
+#απάντηση και την έγραψα στο παράθυρο του riddle
+
+#challenge 10
+#Ένα link στο secret_number πριν τρέξω το riddle
+
+#challenge 13
+truncate --size=30K .hello_there #σε άλλο cl ενώ τρέχει το riddle 
+
+#challenge 14
+echo 32766 > /proc/sys/kernel/ns_last_pid #και μετά τρέχω το riddle
