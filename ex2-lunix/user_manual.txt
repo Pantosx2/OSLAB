@@ -6,7 +6,7 @@ Password:
 # cd /home/user/lunix-tng
 # insmod ./lunix.ko 
 # ./mk-lunix-devs.sh 
-# ./lunix-attach /dev/ttyS1 tty_open: 
+# ./lunix-attach /dev/ttyS1 
 ...
 
 $ cat /dev/lunix2-temp
