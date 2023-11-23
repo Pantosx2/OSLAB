@@ -72,6 +72,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
     int ret = 0;
     int digit;
     int i;
+    int negative = 0;
 
     // debug("leaving\n");
     debug("pantos: Entering the update state method\n");
@@ -98,6 +99,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
         debug("pantos: Acquired (%d) type data: %d\n", state->type, data);
         debug("pantos: timestamp: %d\n", sensor->msr_data[state->type]->last_update);
     }
+
     else
     {
         debug("pantos: no data to acquire \n");
@@ -124,6 +126,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
             break;
         case LIGHT:
             looked_up_data = lookup_light[data];
+
             break;
         default:
             // code should never reach here but it is needed to keep compiler happy
@@ -133,17 +136,35 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 
         debug("pantos: Looked up data is: %ld\n", looked_up_data);
 
-        // TODO: Implement a correct conversion
-        // This loop just prints the louked up data in reverse order and ignoring sign
-        i = 0;
-        while (looked_up_data != 0 && i < LUNIX_CHRDEV_BUFSZ)
+        // Converting from long to readable string
+        i = 9;
+        state->buf_data[i--] = '\0';
+        state->buf_data[i--] = ' ';
+        if (looked_up_data < 0)
+            negative = 1;
+        while (i > -1)
         {
-            digit = looked_up_data % 10;
-            state->buf_data[i++] = '0' + digit;
-            looked_up_data /= 10;
+            if (i == 4)
+                state->buf_data[i--] = '.';
+            else if (looked_up_data == 0 && i > 2)
+                state->buf_data[i--] = '0';
+            else if (looked_up_data == 0)
+                state->buf_data[i--] = ' ';
+            else
+            {
+                digit = looked_up_data % 10;
+                state->buf_data[i--] = '0' + digit;
+                looked_up_data /= 10;
+            }
         }
-        state->buf_data[i++] = '\0';
-        state->buf_lim = i;
+        i = 0;
+        if (negative)
+        {
+            while (state->buf_data[i + 1] == ' ')
+                i++;
+            state->buf_data[i] = '-';
+        }
+        state->buf_lim = 10;
     }
 
     debug("pantos: leaving update state\n");
@@ -251,6 +272,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
             // debug("pantos: Entering sleeping\n");
 
             up(&state->lock);
+
             if (wait_event_interruptible(sensor->wq, (lunix_chrdev_state_needs_refresh(state) == 1)))
                 return -ERESTARTSYS;
             /* signal: tell the fs layer to handle it */
