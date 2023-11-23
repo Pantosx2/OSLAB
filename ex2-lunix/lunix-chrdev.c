@@ -52,6 +52,7 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
     WARN_ON(!(sensor = state->sensor));
 
     /* ? */ // TODO
+    return state->buf_timestamp != sensor->msr_data[state->type]->last_update;
 
     /* The following return is bogus, just for the stub to compile */
     return 0; /* ? */ // TODO
@@ -65,20 +66,45 @@ static int lunix_chrdev_state_needs_refresh(struct lunix_chrdev_state_struct *st
 static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 {
     struct lunix_sensor_struct __attribute__((unused)) * sensor;
-    sensor = state->sensor;
-    debug("leaving\n");
+    int new_data;
+    uint32_t data;
+    long looked_up_data;
+    int ret = 0;
+    int digit;
+    int i;
 
+    // debug("leaving\n");
+    debug("pantos: Entering the update state method\n");
+    sensor = state->sensor;
+    new_data = 0;
     /*
      * Grab the raw data quickly, hold the
      * spinlock for as little as possible.
      */
-    /* ? */ // TODO
+    /* ? */
+    spin_lock(&sensor->lock);
     /* Why use spinlocks? See LDD3, p. 119 */
 
     /*
      * Any new data available?
      */
     /* ? */ // TODO
+    if (state->buf_timestamp != sensor->msr_data[state->type]->last_update)
+    {
+        debug("pantos: bufer_timestamp: %d\n", state->buf_timestamp);
+        new_data = 1;
+        state->buf_timestamp = sensor->msr_data[state->type]->last_update;
+        data = sensor->msr_data[state->type]->values[0];
+        debug("pantos: Acquired (%d) type data: %d\n", state->type, data);
+        debug("pantos: timestamp: %d\n", sensor->msr_data[state->type]->last_update);
+    }
+    else
+    {
+        debug("pantos: no data to acquire \n");
+        ret = -EAGAIN;
+    }
+
+    spin_unlock(&sensor->lock);
 
     /*
      * Now we can take our time to format them,
@@ -86,9 +112,44 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
      */
 
     /* ? */ // TODO
+    if (new_data)
+    {
+        switch (state->type)
+        {
+        case BATT:
+            looked_up_data = lookup_voltage[data];
+            break;
+        case TEMP:
+            looked_up_data = lookup_temperature[data];
+            break;
+        case LIGHT:
+            looked_up_data = lookup_light[data];
+            break;
+        default:
+            // code should never reach here but it is needed to keep compiler happy
+            return -1;
+            break;
+        }
 
-    debug("leaving\n");
-    return 0;
+        debug("pantos: Looked up data is: %ld\n", looked_up_data);
+
+        // TODO: Implement a correct conversion
+        // This loop just prints the louked up data in reverse order and ignoring sign
+        i = 0;
+        while (looked_up_data != 0 && i < LUNIX_CHRDEV_BUFSZ)
+        {
+            digit = looked_up_data % 10;
+            state->buf_data[i++] = '0' + digit;
+            looked_up_data /= 10;
+        }
+        state->buf_data[i++] = '\0';
+        state->buf_lim = i;
+    }
+
+    debug("pantos: leaving update state\n");
+    debug("pantos: created buffer: %s\n", state->buf_data);
+
+    return ret;
 }
 
 /*************************************
@@ -115,7 +176,6 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
      * Associate this open file with the relevant sensor based on
      * the minor number of the device node [/dev/sensor<NO>-<TYPE>]
      */
-    filp->private_data = state;
 
     /* Allocate a new Lunix character device private state structure */
 
@@ -126,13 +186,15 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
     // Allocate a new state struct initialized to 0
     state = kzalloc(sizeof(*state), GFP_KERNEL);
 
+    filp->private_data = state;
     // Set the fields of the struct to point at the corect sensor struct and correct type
     // Based on the minor number
     state->sensor = &lunix_sensors[sensor_number];
-    state->type = minor_number - (sensor_number);
+    state->type = minor_number % 8;
+    debug("pantos: Opening sensor: %d-%d\n", sensor_number, state->type);
 
     // initialize semaphore
-    init_MUTEX(state->lock);
+    sema_init(&state->lock, 1);
 
     /* ? */
 
@@ -158,6 +220,7 @@ static long lunix_chrdev_ioctl(struct file *filp, unsigned int cmd, unsigned lon
 static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t cnt, loff_t *f_pos)
 {
     ssize_t ret;
+    unsigned long bytes;
 
     struct lunix_sensor_struct *sensor;
     struct lunix_chrdev_state_struct *state;
@@ -170,7 +233,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 
     /* Lock? */
     // LDD3, page 112
-    if (down_interruptible(&state->sem))
+    if (down_interruptible(&state->lock))
         return -ERESTARTSYS;
 
     /*
@@ -182,9 +245,20 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
     {
         while (lunix_chrdev_state_update(state) == -EAGAIN)
         {
-            /* ? */ // TODO
             /* The process needs to sleep */
             /* See LDD3, page 153 for a hint */
+            /* ? */ // TODO
+            // debug("pantos: Entering sleeping\n");
+
+            up(&state->lock);
+            if (wait_event_interruptible(sensor->wq, (lunix_chrdev_state_needs_refresh(state) == 1)))
+                return -ERESTARTSYS;
+            /* signal: tell the fs layer to handle it */
+            /* otherwise loop, but first reacquire the lock */
+            // debug("pantos: Exiting sleeping\n");
+
+            if (down_interruptible(&state->lock))
+                return -ERESTARTSYS;
         }
     }
 
@@ -192,7 +266,19 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
     /* ? */ // TODO
 
     /* Determine the number of cached bytes to copy to userspace */
-    /* ? */ // TODO
+    /* ? */
+    if (cnt > state->buf_lim)
+        bytes = state->buf_lim;
+    else
+        bytes = cnt;
+
+    ret = copy_to_user(usrbuf, state->buf_data, bytes);
+    if (ret)
+    {
+        debug("pantos: problem in copy to user\n");
+        goto out;
+    }
+    ret = bytes;
 
     /* Auto-rewind on EOF mode? */
     /* ? */ // TODO
@@ -203,12 +289,13 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
      * It's true, this helpcode is a stub, and doesn't use them properly.
      * Remove them when you've started working on this code.
      */
-    ret = -ENODEV;
-    goto out;
+    // ret = -ENODEV;
+    // goto out;
+    ;
 out:
     /* Unlock? */
     // LDD3, page 113
-    up(&state->sem);
+    up(&state->lock);
 
     return ret;
 }
