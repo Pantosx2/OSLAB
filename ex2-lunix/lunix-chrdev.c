@@ -75,7 +75,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
     int negative = 0;
 
     // debug("leaving\n");
-    debug("pantos: Entering the update state method\n");
+    // debug("pantos: Entering the update state method\n");
     sensor = state->sensor;
     new_data = 0;
     /*
@@ -92,12 +92,12 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
     /* ? */ // TODO
     if (state->buf_timestamp != sensor->msr_data[state->type]->last_update)
     {
-        debug("pantos: bufer_timestamp: %d\n", state->buf_timestamp);
+        // debug("pantos: bufer_timestamp: %d\n", state->buf_timestamp);
         new_data = 1;
         state->buf_timestamp = sensor->msr_data[state->type]->last_update;
         data = sensor->msr_data[state->type]->values[0];
         debug("pantos: Acquired (%d) type data: %d\n", state->type, data);
-        debug("pantos: timestamp: %d\n", sensor->msr_data[state->type]->last_update);
+        // debug("pantos: timestamp: %d\n", sensor->msr_data[state->type]->last_update);
     }
 
     else
@@ -134,7 +134,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
             break;
         }
 
-        debug("pantos: Looked up data is: %ld\n", looked_up_data);
+        // debug("pantos: Looked up data is: %ld\n", looked_up_data);
 
         // Converting from long to readable string
         i = 9;
@@ -167,7 +167,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
         state->buf_lim = 10;
     }
 
-    debug("pantos: leaving update state\n");
+    // debug("pantos: leaving update state\n");
     debug("pantos: created buffer: %s\n", state->buf_data);
 
     return ret;
@@ -289,31 +289,31 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 
     /* Determine the number of cached bytes to copy to userspace */
     /* ? */
-    if (cnt > state->buf_lim)
-        bytes = state->buf_lim;
+    if (cnt > state->buf_lim - *f_pos)
+        bytes = state->buf_lim - *f_pos;
     else
         bytes = cnt;
 
-    ret = copy_to_user(usrbuf, state->buf_data, bytes);
+    debug("pantos: Trying to copy to user with %d bytes\n", bytes);
+
+    ret = copy_to_user(usrbuf, state->buf_data + *f_pos, bytes);
     if (ret)
     {
-        debug("pantos: problem in copy to user\n");
+        debug("pantos: copy to user failed\n");
+        ret = -EFAULT;
         goto out;
     }
+    debug("pantos: copy to user succesfull\n");
+
     ret = bytes;
 
-    /* Auto-rewind on EOF mode? */
-    /* ? */ // TODO
+    *f_pos += bytes;
 
-    /*
-     * The next two lines  are just meant to suppress a compiler warning
-     * for the "unused" out: label, and for the uninitialized "ret" value.
-     * It's true, this helpcode is a stub, and doesn't use them properly.
-     * Remove them when you've started working on this code.
-     */
-    // ret = -ENODEV;
-    // goto out;
-    ;
+    /* Auto-rewind on EOF mode? */
+    /* ? */
+    if (*f_pos >= state->buf_lim)
+        *f_pos = 0;
+
 out:
     /* Unlock? */
     // LDD3, page 113
