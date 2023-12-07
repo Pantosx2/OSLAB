@@ -72,9 +72,10 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
     int ret = 0;
     int digit;
     int i;
+    int negative = 0;
 
     // debug("leaving\n");
-    debug("pantos: Entering the update state method\n");
+    // debug("pantos: Entering the update state method\n");
     sensor = state->sensor;
     new_data = 0;
     /*
@@ -91,13 +92,14 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
     /* ? */ // TODO
     if (state->buf_timestamp != sensor->msr_data[state->type]->last_update)
     {
-        debug("pantos: bufer_timestamp: %d\n", state->buf_timestamp);
+        // debug("pantos: bufer_timestamp: %d\n", state->buf_timestamp);
         new_data = 1;
         state->buf_timestamp = sensor->msr_data[state->type]->last_update;
         data = sensor->msr_data[state->type]->values[0];
         debug("pantos: Acquired (%d) type data: %d\n", state->type, data);
-        debug("pantos: timestamp: %d\n", sensor->msr_data[state->type]->last_update);
+        // debug("pantos: timestamp: %d\n", sensor->msr_data[state->type]->last_update);
     }
+
     else
     {
         debug("pantos: no data to acquire \n");
@@ -124,6 +126,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
             break;
         case LIGHT:
             looked_up_data = lookup_light[data];
+
             break;
         default:
             // code should never reach here but it is needed to keep compiler happy
@@ -131,22 +134,42 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
             break;
         }
 
-        debug("pantos: Looked up data is: %ld\n", looked_up_data);
+        // debug("pantos: Looked up data is: %ld\n", looked_up_data);
 
-        // TODO: Implement a correct conversion
-        // This loop just prints the looked up data in reverse order and ignoring sign
-        i = 0;
-        while (looked_up_data != 0 && i < LUNIX_CHRDEV_BUFSZ)
+
+
+        // Converting from long to readable string
+        i = 9;
+        state->buf_data[i--] = '\0';
+        state->buf_data[i--] = ' ';
+        if (looked_up_data < 0)
+            negative = 1;
+        while (i > -1)
         {
-            digit = looked_up_data % 10;
-            state->buf_data[i++] = '0' + digit;
-            looked_up_data /= 10;
+            if (i == 4)
+                state->buf_data[i--] = '.';
+            else if (looked_up_data == 0 && i > 2)
+                state->buf_data[i--] = '0';
+            else if (looked_up_data == 0)
+                state->buf_data[i--] = ' ';
+            else
+            {
+                digit = looked_up_data % 10;
+                state->buf_data[i--] = '0' + digit;
+                looked_up_data /= 10;
+            }
         }
-        state->buf_data[i++] = '\0';
-        state->buf_lim = i;
+        i = 0;
+        if (negative)
+        {
+            while (state->buf_data[i + 1] == ' ')
+                i++;
+            state->buf_data[i] = '-';
+        }
+        state->buf_lim = 10;
     }
 
-    debug("pantos: leaving update state\n");
+    // debug("pantos: leaving update state\n");
     debug("pantos: created buffer: %s\n", state->buf_data);
 
     return ret;
@@ -251,6 +274,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
             // debug("pantos: Entering sleeping\n");
 
             up(&state->lock);
+
             if (wait_event_interruptible(sensor->wq, (lunix_chrdev_state_needs_refresh(state) == 1)))
                 return -ERESTARTSYS;
             /* signal: tell the fs layer to handle it */
@@ -267,31 +291,31 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 
     /* Determine the number of cached bytes to copy to userspace */
     /* ? */
-    if (cnt > state->buf_lim)
-        bytes = state->buf_lim;
+    if (cnt > state->buf_lim - *f_pos)
+        bytes = state->buf_lim - *f_pos;
     else
         bytes = cnt;
 
-    ret = copy_to_user(usrbuf, state->buf_data, bytes);
+    debug("pantos: Trying to copy to user with %d bytes\n", bytes);
+
+    ret = copy_to_user(usrbuf, state->buf_data + *f_pos, bytes);
     if (ret)
     {
-        debug("pantos: problem in copy to user\n");
+        debug("pantos: copy to user failed\n");
+        ret = -EFAULT;
         goto out;
     }
+    debug("pantos: copy to user succesfull\n");
+
     ret = bytes;
 
-    /* Auto-rewind on EOF mode? */
-    /* ? */ // TODO
+    *f_pos += bytes;
 
-    /*
-     * The next two lines  are just meant to suppress a compiler warning
-     * for the "unused" out: label, and for the uninitialized "ret" value.
-     * It's true, this helpcode is a stub, and doesn't use them properly.
-     * Remove them when you've started working on this code.
-     */
-    // ret = -ENODEV;
-    // goto out;
-    ;
+    /* Auto-rewind on EOF mode? */
+    /* ? */
+    if (*f_pos >= state->buf_lim)
+        *f_pos = 0;
+
 out:
     /* Unlock? */
     // LDD3, page 113
