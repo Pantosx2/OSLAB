@@ -4,7 +4,7 @@
  * Implementation of character devices
  * for Lunix:TNG
  *
- * < Your name here >
+ * < Pantos Pantos - Kokolakis Georgios >
  *
  */
 
@@ -134,7 +134,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
         debug("pantos: Looked up data is: %ld\n", looked_up_data);
 
         // TODO: Implement a correct conversion
-        // This loop just prints the louked up data in reverse order and ignoring sign
+        // This loop just prints the looked up data in reverse order and ignoring sign
         i = 0;
         while (looked_up_data != 0 && i < LUNIX_CHRDEV_BUFSZ)
         {
